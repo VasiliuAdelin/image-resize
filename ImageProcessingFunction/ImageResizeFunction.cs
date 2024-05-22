@@ -22,7 +22,7 @@ public static class ImageProcessingFunction
         try
         {
             string connectionString = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
-            string inputContainerName = "rawImages";
+            string inputContainerName = "rawimages";
             string outputContainerName = "resizedimages";
 
             BlobServiceClient blobServiceClient = new BlobServiceClient(connectionString);
@@ -47,10 +47,8 @@ public static class ImageProcessingFunction
                         await outputBlobClient.UploadAsync(outputStream, true);
                     }
 
-                    using (MemoryStream emptyStream = new MemoryStream())
-                    {
-                        await inputBlobClient.UploadAsync(emptyStream, overwrite: true);
-                    }
+                    await inputBlobClient.DeleteIfExistsAsync();
+
                 }
             }
 
@@ -65,18 +63,33 @@ public static class ImageProcessingFunction
 
     private static byte[] GenerateThumbnail(byte[] imageData)
     {
+        if (imageData == null || imageData.Length == 0)
+            throw new ArgumentNullException(nameof(imageData), "Image data cannot be null or empty.");
+
         using (var inputStream = new MemoryStream(imageData))
         using (var original = SKBitmap.Decode(inputStream))
         {
-            int thumbnailWidth = 100;
-            int thumbnailHeight = (int)((thumbnailWidth / (double)original.Width) * original.Height);
+            if (original == null)
+                throw new InvalidOperationException("Failed to decode the input image.");
 
-            using (var resized = original.Resize(new SKImageInfo(thumbnailWidth, thumbnailHeight), SKFilterQuality.High))
-            using (var image = SKImage.FromBitmap(resized))
-            using (var outputStream = new MemoryStream())
+            using (var surface = SKSurface.Create(new SKImageInfo(300, 300)))
             {
-                image.Encode(SKEncodedImageFormat.Jpeg, 100).SaveTo(outputStream);
-                return outputStream.ToArray();
+                var canvas = surface.Canvas;
+
+                canvas.Clear(SKColors.Transparent);
+
+                var paint = new SKPaint();
+                canvas.DrawBitmap(original, SKRect.Create(0, 0, 300, 300), paint);
+
+                paint.Color = SKColors.Red;
+                paint.TextSize = 20;
+                canvas.DrawText("cloud computing", 10, 30, paint);
+
+                using (var image = surface.Snapshot())
+                using (var encodedData = image.Encode())
+                {
+                    return encodedData.ToArray();
+                }
             }
         }
     }
