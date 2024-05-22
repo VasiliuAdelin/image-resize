@@ -79,10 +79,10 @@ public static class ImageProcessingFunction
                 canvas.Clear(SKColors.Transparent);
 
                 var paint = new SKPaint();
-                canvas.DrawBitmap(original, SKRect.Create(0, 0, 300, 300), paint);
+                canvas.DrawBitmap(original, SKRect.Create(0, 0, 500, 500), paint);
 
                 paint.Color = SKColors.Red;
-                paint.TextSize = 20;
+                paint.TextSize = 23;
                 canvas.DrawText("cloud computing", 10, 30, paint);
 
                 using (var image = surface.Snapshot())
