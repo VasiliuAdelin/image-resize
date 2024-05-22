@@ -19,40 +19,48 @@ public static class ImageProcessingFunction
     {
         log.LogInformation("C# HTTP trigger function processed a request.");
 
-        string connectionString = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
-        string inputContainerName = "rawImages";
-        string outputContainerName = "resizedimages";
-
-        BlobServiceClient blobServiceClient = new BlobServiceClient(connectionString);
-        BlobContainerClient inputContainerClient = blobServiceClient.GetBlobContainerClient(inputContainerName);
-        BlobContainerClient outputContainerClient = blobServiceClient.GetBlobContainerClient(outputContainerName);
-
-        await foreach (BlobItem blobItem in inputContainerClient.GetBlobsAsync())
+        try
         {
-            BlobClient inputBlobClient = inputContainerClient.GetBlobClient(blobItem.Name);
-            BlobDownloadInfo download = await inputBlobClient.DownloadAsync();
+            string connectionString = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
+            string inputContainerName = "rawImages";
+            string outputContainerName = "resizedimages";
 
-            using (MemoryStream ms = new MemoryStream())
+            BlobServiceClient blobServiceClient = new BlobServiceClient(connectionString);
+            BlobContainerClient inputContainerClient = blobServiceClient.GetBlobContainerClient(inputContainerName);
+            BlobContainerClient outputContainerClient = blobServiceClient.GetBlobContainerClient(outputContainerName);
+
+            await foreach (BlobItem blobItem in inputContainerClient.GetBlobsAsync())
             {
-                await download.Content.CopyToAsync(ms);
-                ms.Position = 0;
+                BlobClient inputBlobClient = inputContainerClient.GetBlobClient(blobItem.Name);
+                BlobDownloadInfo download = await inputBlobClient.DownloadAsync();
 
-                byte[] processedImageData = GenerateThumbnail(ms.ToArray());
-
-                BlobClient outputBlobClient = outputContainerClient.GetBlobClient(blobItem.Name);
-                using (MemoryStream outputStream = new MemoryStream(processedImageData))
+                using (MemoryStream ms = new MemoryStream())
                 {
-                    await outputBlobClient.UploadAsync(outputStream, true);
-                }
+                    await download.Content.CopyToAsync(ms);
+                    ms.Position = 0;
 
-                using (MemoryStream emptyStream = new MemoryStream())
-                {
-                    await inputBlobClient.UploadAsync(emptyStream, overwrite: true);
+                    byte[] processedImageData = GenerateThumbnail(ms.ToArray());
+
+                    BlobClient outputBlobClient = outputContainerClient.GetBlobClient(blobItem.Name);
+                    using (MemoryStream outputStream = new MemoryStream(processedImageData))
+                    {
+                        await outputBlobClient.UploadAsync(outputStream, true);
+                    }
+
+                    using (MemoryStream emptyStream = new MemoryStream())
+                    {
+                        await inputBlobClient.UploadAsync(emptyStream, overwrite: true);
+                    }
                 }
             }
-        }
 
-        return new OkObjectResult("Processed all images.");
+            return new OkObjectResult("Processed all images.");
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "An error occurred while processing images.");
+            return new StatusCodeResult(StatusCodes.Status500InternalServerError);
+        }
     }
 
     private static byte[] GenerateThumbnail(byte[] imageData)
