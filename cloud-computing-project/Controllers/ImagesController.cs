@@ -1,7 +1,12 @@
 ﻿using cloud_computing_project.Helpers;
 using cloud_computing_project.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Threading.Tasks;
 
 namespace cloud_computing_project.Controllers
 {
@@ -9,10 +14,12 @@ namespace cloud_computing_project.Controllers
     public class ImagesController : Controller
     {
         private readonly AzureStorageConfig storageConfig = null;
+        private readonly ILogger<ImagesController> _logger;
 
-        public ImagesController(IOptions<AzureStorageConfig> config)
+        public ImagesController(IOptions<AzureStorageConfig> config, ILogger<ImagesController> logger)
         {
             storageConfig = config.Value;
+            _logger = logger;
         }
 
         [HttpPost("[action]")]
@@ -23,13 +30,22 @@ namespace cloud_computing_project.Controllers
             try
             {
                 if (files.Count == 0)
+                {
+                    _logger.LogWarning("No files received from the upload.");
                     return BadRequest("No files received from the upload");
+                }
 
-                if (storageConfig.AccountKey == string.Empty || storageConfig.AccountName == string.Empty)
-                    return BadRequest("sorry, can't retrieve your azure storage details from appsettings.js, make sure that you add azure storage details there");
+                if (string.IsNullOrEmpty(storageConfig.AccountKey) || string.IsNullOrEmpty(storageConfig.AccountName))
+                {
+                    _logger.LogError("Azure storage details are missing in appsettings.js.");
+                    return BadRequest("Sorry, can't retrieve your Azure storage details from appsettings.js, make sure that you add Azure storage details there");
+                }
 
-                if (storageConfig.ImageContainer == string.Empty)
-                    return BadRequest("Please provide a name for your image container in the azure blob storage");
+                if (string.IsNullOrEmpty(storageConfig.ImageContainer))
+                {
+                    _logger.LogError("Image container name is missing in Azure blob storage.");
+                    return BadRequest("Please provide a name for your image container in Azure blob storage");
+                }
 
                 foreach (var formFile in files)
                 {
@@ -45,22 +61,27 @@ namespace cloud_computing_project.Controllers
                     }
                     else
                     {
+                        _logger.LogWarning("Unsupported media type: {FileName}", formFile.FileName);
                         return new UnsupportedMediaTypeResult();
                     }
                 }
 
                 if (isUploaded)
                 {
-                    if (storageConfig.ThumbnailContainer != string.Empty)
+                    if (!string.IsNullOrEmpty(storageConfig.ThumbnailContainer))
                         return new AcceptedAtActionResult("GetThumbNails", "Images", null, null);
                     else
                         return new AcceptedResult();
                 }
                 else
-                    return BadRequest("Look like the image couldnt upload to the storage");
+                {
+                    _logger.LogError("Image upload to storage failed.");
+                    return BadRequest("Looks like the image couldn't upload to the storage");
+                }
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Exception caught during image upload.");
                 return BadRequest(ex.Message);
             }
         }
@@ -70,17 +91,24 @@ namespace cloud_computing_project.Controllers
         {
             try
             {
-                if (storageConfig.AccountKey == string.Empty || storageConfig.AccountName == string.Empty)
+                if (string.IsNullOrEmpty(storageConfig.AccountKey) || string.IsNullOrEmpty(storageConfig.AccountName))
+                {
+                    _logger.LogError("Azure storage details are missing in appsettings.js.");
                     return BadRequest("Sorry, can't retrieve your Azure storage details from appsettings.js, make sure that you add Azure storage details there.");
+                }
 
-                if (storageConfig.ImageContainer == string.Empty)
+                if (string.IsNullOrEmpty(storageConfig.ImageContainer))
+                {
+                    _logger.LogError("Image container name is missing in Azure blob storage.");
                     return BadRequest("Please provide a name for your image container in Azure blob storage.");
+                }
 
                 List<string> thumbnailUrls = await StorageHelper.GetThumbNailUrls(storageConfig);
                 return new ObjectResult(thumbnailUrls);
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Exception caught during getting thumbnails.");
                 return BadRequest(ex.Message);
             }
         }
