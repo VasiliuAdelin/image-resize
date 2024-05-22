@@ -20,8 +20,8 @@ public static class ImageProcessingFunction
         log.LogInformation("C# HTTP trigger function processed a request.");
 
         string connectionString = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
-        string inputContainerName = "input-container";
-        string outputContainerName = "output-container";
+        string inputContainerName = "rawImages";
+        string outputContainerName = "resizedimages";
 
         BlobServiceClient blobServiceClient = new BlobServiceClient(connectionString);
         BlobContainerClient inputContainerClient = blobServiceClient.GetBlobContainerClient(inputContainerName);
