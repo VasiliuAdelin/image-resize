@@ -43,9 +43,7 @@ namespace cloud_computing_project.Helpers
         {
             List<string> thumbnailUrls = new List<string>();
 
-            Uri accountUri = new Uri("https://" + _storageConfig.AccountName + ".blob.core.windows.net/");
-
-            BlobServiceClient blobServiceClient = new BlobServiceClient(accountUri);
+            BlobServiceClient blobServiceClient = new BlobServiceClient($"DefaultEndpointsProtocol=https;AccountName={_storageConfig.AccountName};AccountKey={_storageConfig.AccountKey};EndpointSuffix=core.windows.net");
 
             BlobContainerClient container = blobServiceClient.GetBlobContainerClient(_storageConfig.ThumbnailContainer);
 
